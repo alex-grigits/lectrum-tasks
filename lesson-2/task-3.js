@@ -1,9 +1,16 @@
 class Log {
-  constructor(timer, out) {
+  constructor(timer, error, out) {
     this.name = timer.name;
     this.in = timer.jobArgs;
     this.out = out;
     this.created = new Date();
+    if (error) {
+      this.error = {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      };
+    }
   }
 }
 
@@ -14,14 +21,18 @@ class TimersManager {
     this.logs = [];
   }
 
-  _log(timer, out) {
-    this.logs.push(new Log(timer, out));
+  _log(timer, error = null, out) {
+    this.logs.push(new Log(timer, error, out));
   }
 
   _doJob(timer) {
     return () => {
-      const out = timer.job(...timer.jobArgs);
-      this._log(timer, out);
+      try {
+        const out = timer.job(...timer.jobArgs);
+        this._log(timer, null, out);
+      } catch (error) {
+        this._log(timer, error);
+      }
     };
   }
 
@@ -72,6 +83,8 @@ class TimersManager {
   start() {
     if (this.timers.length > 0) {
       this.timers.forEach(timer => {
+        // First implementation
+        // setTimeout(() => timer.job(...timer.args), timer.delay);
         if (timer.interval) {
           this.registeredTimers[timer.name] = setInterval(
             this._doJob(timer),
@@ -129,13 +142,25 @@ const t1 = {
 
 const t2 = {
   name: 't2',
-  delay: 2000,
+  delay: 1000,
   interval: false,
   job: name => `Hello ${name}`
 };
 
-manager.add(t1, 2, 3).add(t2, 'John');
+const t3 = {
+  name: 't3',
+  delay: 1000,
+  interval: false,
+  job: () => {
+    throw new Error('Huston, we have a problem');
+  }
+};
+
+manager
+  .add(t1, 2, 3)
+  .add(t2, 'John')
+  .add(t3, 1);
 
 manager.start();
 
-setTimeout(() => manager.print(), 3000);
+setTimeout(() => manager.print(), 2000);
