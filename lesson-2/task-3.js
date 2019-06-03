@@ -83,8 +83,6 @@ class TimersManager {
   start() {
     if (this.timers.length > 0) {
       this.timers.forEach(timer => {
-        // First implementation
-        // setTimeout(() => timer.job(...timer.args), timer.delay);
         if (timer.interval) {
           this.registeredTimers[timer.name] = setInterval(
             this._doJob(timer),

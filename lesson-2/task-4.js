@@ -1,7 +1,44 @@
+class Log {
+  constructor(timer, error, out) {
+    this.name = timer.name;
+    this.in = timer.jobArgs;
+    this.out = out;
+    this.created = new Date();
+    if (error) {
+      this.error = {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      };
+    }
+  }
+}
+
 class TimersManager {
   constructor() {
     this.timers = [];
     this.registeredTimers = {};
+    this.logs = [];
+    this.longestTimerDelay = 10000;
+  }
+
+  _log(timer, error = null, out) {
+    this.logs.push(new Log(timer, error, out));
+  }
+
+  _doJob(timer) {
+    return () => {
+      try {
+        const out = timer.job(...timer.jobArgs);
+        this._log(timer, null, out);
+      } catch (error) {
+        this._log(timer, error);
+      }
+    };
+  }
+
+  print() {
+    console.log(this.logs);
   }
 
   add(timer, ...rest) {
@@ -34,6 +71,7 @@ class TimersManager {
     }
     timer.jobArgs = rest;
     this.timers.push(timer);
+
     return this;
   }
 
@@ -45,21 +83,25 @@ class TimersManager {
 
   start() {
     if (this.timers.length > 0) {
+      // find the longest timer delay
+      this.longestTimerDelay += this.timers.reduce((delay, prev) => {
+        return prev.delay > delay ? prev.delay : delay;
+      }, 0);
       this.timers.forEach(timer => {
         if (timer.interval) {
           this.registeredTimers[timer.name] = setInterval(
-            timer.job,
-            timer.delay,
-            ...timer.jobArgs
+            this._doJob(timer),
+            timer.delay
           );
         } else {
           this.registeredTimers[timer.name] = setTimeout(
-            timer.job,
-            timer.delay,
-            ...timer.jobArgs
+            this._doJob(timer),
+            timer.delay
           );
         }
       });
+      // set timout for the main timer
+      setTimeout(() => this.stop(), this.longestTimerDelay);
     } else {
       throw new Error('Please, add the timers first!');
     }
@@ -98,50 +140,32 @@ const manager = new TimersManager();
 
 const t1 = {
   name: 't1',
-  delay: 2000,
-  interval: false,
-  job: () => console.log('t1')
+  delay: 1000,
+  interval: true,
+  job: (a, b) => a + b
 };
 
 const t2 = {
   name: 't2',
-  delay: 3000,
+  delay: 2000,
   interval: false,
-  job: (a, b) => {
-    console.log(a + b);
-  }
+  job: name => `Hello ${name}`
 };
 
 const t3 = {
   name: 't3',
-  delay: 4000,
-  interval: true,
-  job: x => console.log(x * x)
-};
-
-const t4 = {
-  name: 't6',
-  delay: 5000,
-  interval: true,
-  job: x => console.log(x * x)
+  delay: 3000,
+  interval: false,
+  job: () => {
+    throw new Error('Huston, we have a problem');
+  }
 };
 
 manager
-  .add(t1)
-  .add(t2, 4, 10)
-  .add(t3, 5)
-  .add(t4, 10);
+  .add(t1, 2, 3)
+  .add(t2, 'John')
+  .add(t3, 1);
 
 manager.start();
 
-// manager.remove('t3');
-
-// manager.stop();
-// console.log(1);
-// manager.pause('t1');
-
-// manager.remove('t2');
-
-manager.pause('t3');
-// setTimeout(() => manager.resume('t3'), 6000);
-setTimeout(() => manager.resume('t3'), 10000);
+setTimeout(() => manager.print(), manager.longestTimerDelay + 1000);
